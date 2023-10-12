@@ -1,18 +1,3 @@
-;
-export class Command {
-    type;
-    flags = new Set();
-    params = new Map();
-    constructor({ type, flags, params }) {
-        this.type = type;
-        for (const flag of flags) {
-            this.flags.add(flag);
-        }
-        for (const param in params) {
-            this.params.set(param, params[param]);
-        }
-    }
-}
 const lineStylePattern = /(?:%c{(.*?)})?(.+?)(?:(?=%c{)|$)/gs; // <text>%c{<style_data>}<text> // edge case: styling cannot start on first char, need to revise RegEx pattern
 export class Terminal {
     els = {
@@ -199,7 +184,8 @@ export class Terminal {
     }
     repeatInputText() {
         const line = this.els.inputIndicator.innerText + this.els.consoleInput.value;
-        this.writeLine(`%c{background-color:#ffffff44}${line}`);
+        // this.writeLine(`%c{background-color:#ffffff44}${line}`);
+        this.writeLine(line);
     }
     setIndicatorText(text) {
         this.els.inputIndicator.innerText = text;
