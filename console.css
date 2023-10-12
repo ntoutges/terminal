@@ -1,0 +1,106 @@
+@font-face {
+  font-family: "Terminal";
+  src: url(CourierPrime-Regular.ttf);
+}
+
+.consoles {
+  width: calc(100% - 10px);
+  height: calc(100% - 10px);
+  background-color: black;
+  padding: 5px;
+
+  display: flex;
+  flex-direction: column;
+
+  font-size: 20px;
+  font-family: 'Terminal';
+  color: white;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.consoles:hover {
+  cursor: text;
+}
+
+.console-line-holders {
+  width: 100%;
+  background-color: black;
+  
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+}
+
+.console-input-line {
+  width: 100%;
+  display: flex;
+
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+}
+
+.console-input-line {
+  width: 100%;
+  display: flex;
+
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+}
+
+.console-input-indicators {
+  white-space: pre-wrap;
+}
+
+.console-inputs {
+  background-color: transparent;
+  flex-grow: 1;
+
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+
+  border: none;
+  padding: 0px;
+
+  resize: none;
+  overflow: hidden;
+}
+
+.console-inputs:focus {
+  outline: none;
+}
+
+.console-inputs.multiline {
+  background-color: #ffffff30;
+}
+
+.console-width-getter {
+  overflow: hidden;
+
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  max-width: calc(100% - 10px);
+  
+  font-size: inherit;
+  font-family: inherit;
+  display: inline-block;
+
+  white-space: pre-wrap;
+  word-wrap: break-word;
+
+  user-select: none;
+  opacity: 0;
+}
+
+.console-lines {
+  white-space: pre-wrap;
+}
+
+.console-lines:not(:last-child):empty::after {
+  content: ' ';
+}
