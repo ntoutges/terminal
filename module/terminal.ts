@@ -241,6 +241,8 @@ export class Terminal {
     }
     this.workingLine = this.buildLine(sections); // reassign working line to new line
     this.workingText = this.workingText.substring(this.workingText.lastIndexOf("\n")+1);
+
+    this.els.body.scrollTo(0, this.els.body.scrollHeight);
   }
   printLine(text: string) {
     this.print(text + "\n");
