@@ -41,7 +41,7 @@ export type CommandStructure = {
   oargs?: Record<string,string> // (o)ptional arguments; only accessible through -argname argvalue
   flags?: Record<string,string> // flags; like oargs, but these don't get values
   validate?: (command: Command) => string // able to do preprocessing on Command; returns empty string if command data is good, non-empty if invalid
-  execute: (command: Command, input: string) => Promise<string>
+  execute: (command: Command, terminal: Terminal, input: string) => Promise<string>
 }
 
 export class SimpleShell {
@@ -59,7 +59,12 @@ export class SimpleShell {
 
   protected onCommand(text: string) {
     this.terminal.repeatInputText(text);
-    const chain = createChain(text, splitters, encapsulators);
+    let chain: ChainLink;
+    try { chain = createChain(text, splitters, encapsulators); }
+    catch(err) {
+      this.terminal.printLine(`%c{color:var(--console-err)}${err.message}`);
+      return;
+    }
 
     this.terminal.disable();
     this.currentCommand = null;
@@ -88,12 +93,12 @@ export class SimpleShell {
 
     const cmdData = chain.execute( lastOutput, lastStatus );
     if (cmdData.command == null) { // finished--print output
-      if (lastOutput.length > 0) this.terminal.writeLine(lastOutput);
+      if (lastOutput.length > 0) this.terminal.printLine(lastOutput);
       this.currentCommand = null; // reset
       this.terminal.enable();
       return;
     }
-    if (cmdData.output) this.terminal.writeLine(cmdData.output); // next command doesn't use this, so print it out
+    if (cmdData.output) this.terminal.printLine(cmdData.output); // next command doesn't use this, so print it out
 
     const parts = this.extractText(cmdData.command);
     const name = parts[0];
@@ -113,7 +118,7 @@ export class SimpleShell {
         });
         this.currentCommand = command;
 
-        this.commands.get(name).execute(command, cmdData.input).then((output) => {
+        this.commands.get(name).execute(command, this.terminal, cmdData.input).then((output) => {
           if (command.isCanceled) return; // refer to local because global will likely be reassigned
           this.runCommand(
             chain,

@@ -61,6 +61,18 @@ export class Terminal {
         this.els.consoleInput.addEventListener("keydown", this.onkeydown.bind(this));
         this.resizeInput();
         this.setIndicatorText("> ");
+        // sync history from local storage
+        const historyStr = localStorage.getItem(`console-${this.name}`);
+        if (historyStr) {
+            try {
+                const history = JSON.parse(historyStr);
+                if (Array.isArray(history)) {
+                    this.commandHistory = history;
+                    this.historyIndex = this.commandHistory.length;
+                }
+            }
+            catch (_) { } // just prevent errors
+        }
     }
     onkeydown(e) {
         if (e.ctrlKey && e.key == "c") { // ctrl-c
@@ -97,8 +109,8 @@ export class Terminal {
             const reference = this.getLineCount(this.getTextSize(this.els.consoleInput.value).height) - 1;
             if (this.getCaretPosition().line == reference && this.commandHistory.length > 0) { // at top of input box
                 e.preventDefault();
-                this.historyIndex = Math.min(this.historyIndex + 1, this.commandHistory.length - 1);
-                this.els.consoleInput.value = this.commandHistory[this.historyIndex];
+                this.historyIndex = Math.min(this.historyIndex + 1, this.commandHistory.length);
+                this.els.consoleInput.value = this.commandHistory[this.historyIndex] ?? "";
                 this.resizeInput();
                 this.els.consoleInput.selectionStart = this.els.consoleInput.value.length; // set caret at start
             }
@@ -109,6 +121,7 @@ export class Terminal {
             || this.els.consoleInput.value != this.commandHistory[this.commandHistory.length - 1]) { // don't push if same as last element
             this.commandHistory.push(this.els.consoleInput.value);
             this.historyIndex = this.commandHistory.length;
+            localStorage.setItem(`console-${this.name}`, JSON.stringify(this.commandHistory));
         }
     }
     resizeInput() {
@@ -164,7 +177,7 @@ export class Terminal {
         return section;
     }
     // removes last line (if not a new line), then replaces
-    write(text) {
+    print(text) {
         if (this.workingLine != null)
             this.workingLine.remove(); // get rid of working line
         this.workingText = (this.workingText + text).replace(lineCarriageReturnPattern, "");
@@ -187,8 +200,8 @@ export class Terminal {
         this.workingLine = this.buildLine(sections); // reassign working line to new line
         this.workingText = this.workingText.substring(this.workingText.lastIndexOf("\n") + 1);
     }
-    writeLine(text) {
-        this.write(text + "\n");
+    printLine(text) {
+        this.print(text + "\n");
     }
     disable() {
         this.isDisabled = true;
@@ -215,8 +228,8 @@ export class Terminal {
     }
     repeatInputText(altInput = null) {
         const line = this.els.inputIndicator.innerText + (altInput ?? this.els.consoleInput.value);
-        // this.writeLine(`%c{background-color:#ffffff44}${line}`);
-        this.writeLine(line);
+        // this.printLine(`%c{background-color:#ffffff44}${line}`);
+        this.printLine(line);
     }
     setIndicatorText(text) {
         this.els.inputIndicator.innerText = text;

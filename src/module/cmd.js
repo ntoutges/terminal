@@ -38,7 +38,14 @@ export class SimpleShell {
     }
     onCommand(text) {
         this.terminal.repeatInputText(text);
-        const chain = createChain(text, splitters, encapsulators);
+        let chain;
+        try {
+            chain = createChain(text, splitters, encapsulators);
+        }
+        catch (err) {
+            this.terminal.printLine(`%c{color:var(--console-err)}${err.message}`);
+            return;
+        }
         this.terminal.disable();
         this.currentCommand = null;
         this.runCommand(chain, "", true);
@@ -56,13 +63,13 @@ export class SimpleShell {
         const cmdData = chain.execute(lastOutput, lastStatus);
         if (cmdData.command == null) { // finished--print output
             if (lastOutput.length > 0)
-                this.terminal.writeLine(lastOutput);
+                this.terminal.printLine(lastOutput);
             this.currentCommand = null; // reset
             this.terminal.enable();
             return;
         }
         if (cmdData.output)
-            this.terminal.writeLine(cmdData.output); // next command doesn't use this, so print it out
+            this.terminal.printLine(cmdData.output); // next command doesn't use this, so print it out
         const parts = this.extractText(cmdData.command);
         const name = parts[0];
         if (this.commands.has(name)) {
@@ -75,7 +82,7 @@ export class SimpleShell {
                     args: data.args
                 });
                 this.currentCommand = command;
-                this.commands.get(name).execute(command, cmdData.input).then((output) => {
+                this.commands.get(name).execute(command, this.terminal, cmdData.input).then((output) => {
                     if (command.isCanceled)
                         return; // refer to local because global will likely be reassigned
                     this.runCommand(chain, output, true);
