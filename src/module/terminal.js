@@ -1,4 +1,5 @@
-const lineStylePattern = /(?:%c{(.*?)})?(.+?)(?:(?=%c{)|$)/gs; // <text>%c{<style_data>}<text> // edge case: styling cannot start on first char, need to revise RegEx pattern
+const lineStylePattern = /(?:%c{([^%]*?)})?(.+?)(?:(?=%c{)|$)/gs; // <text>%c{<style_data>}<text> // edge case: styling cannot start on first char, need to revise RegEx pattern
+const lineCarriageReturnPattern = /^.*\r/gm;
 export class Terminal {
     els = {
         body: document.createElement("div"),
@@ -12,11 +13,14 @@ export class Terminal {
     doFocusTimeout = null; // used for canceling mousedown if dblclick triggered immediately after
     commandListeners = [];
     keyListeners = [];
+    cancelListeners = [];
     name; // used for local-storage shenanigans
     workingLine = null;
     workingText = "";
     commandHistory = [];
     historyIndex = 0;
+    isDisabled = false;
+    commandQueue = [];
     constructor(name, parent) {
         this.name = name;
         this.els.body.classList.add("consoles");
@@ -59,10 +63,23 @@ export class Terminal {
         this.setIndicatorText("> ");
     }
     onkeydown(e) {
+        if (e.ctrlKey && e.key == "c") { // ctrl-c
+            if (this.els.consoleInput.selectionStart == this.els.consoleInput.selectionEnd) { // only trigger stop if nothing highlighted
+                this.cancelListeners.forEach(callback => { callback(); });
+                this.els.consoleInput.value += "%c{color:var(--command-err)}^C";
+                this.repeatInputText();
+                this.els.consoleInput.value = "";
+                this.enable();
+            }
+            return;
+        }
         if (e.key == "Enter" && !e.shiftKey) { // shift prevents command from being entered
             e.preventDefault(); // prevent "enter" key from actually doing anything
             const line = this.els.consoleInput.value;
-            this.commandListeners.forEach(callback => callback(line));
+            if (this.isDisabled)
+                this.commandQueue.push(line); // push to queue to be executed later
+            else
+                this.commandListeners.forEach(callback => callback(line)); // execute immediately
             this.pushToHistory();
             this.els.consoleInput.value = ""; // clear command line
             this.resizeInput();
@@ -125,6 +142,7 @@ export class Terminal {
     }
     onCommand(callback) { this.commandListeners.push(callback); }
     onKey(callback) { this.keyListeners.push(callback); }
+    onCancel(callback) { this.cancelListeners.push(callback); }
     buildLine(sections) {
         const line = document.createElement("div");
         line.classList.add("console-lines");
@@ -136,7 +154,7 @@ export class Terminal {
     }
     buildSection(text, styleStr = "") {
         const section = document.createElement("span");
-        section.innerText = text;
+        section.innerText = Terminal.decode(text);
         for (const pair of styleStr.split(";")) {
             const [property, value] = pair.split(":");
             if (value === undefined)
@@ -149,7 +167,8 @@ export class Terminal {
     write(text) {
         if (this.workingLine != null)
             this.workingLine.remove(); // get rid of working line
-        this.workingText += text;
+        this.workingText = (this.workingText + text).replace(lineCarriageReturnPattern, "");
+        // simplify \n.*\rabcd to just [abcd]
         const sections = [];
         for (const match of this.workingText.matchAll(lineStylePattern)) {
             const style = match[1] ?? ""; // group 1 gives style (may be null)
@@ -171,6 +190,18 @@ export class Terminal {
     writeLine(text) {
         this.write(text + "\n");
     }
+    disable() {
+        this.isDisabled = true;
+        this.els.inputLine.classList.add("hidden");
+    }
+    enable() {
+        this.isDisabled = false;
+        this.els.inputLine.classList.remove("hidden");
+        if (this.commandQueue.length > 0) { // run next queued command
+            const line = this.commandQueue.splice(0, 1)[0];
+            this.commandListeners.forEach(callback => { callback(line); });
+        }
+    }
     clear(clearHistory = false) {
         this.els.linesHolder.innerHTML = "";
         if (this.workingLine) {
@@ -182,13 +213,15 @@ export class Terminal {
             this.historyIndex = 0;
         }
     }
-    repeatInputText() {
-        const line = this.els.inputIndicator.innerText + this.els.consoleInput.value;
+    repeatInputText(altInput = null) {
+        const line = this.els.inputIndicator.innerText + (altInput ?? this.els.consoleInput.value);
         // this.writeLine(`%c{background-color:#ffffff44}${line}`);
         this.writeLine(line);
     }
     setIndicatorText(text) {
         this.els.inputIndicator.innerText = text;
     }
+    static encode(text) { return text.replace(/%c/g, "<&%_css>"); } // replace %c with some other character
+    static decode(text) { return text.replace(/<&%_css>/g, "%c"); }
 }
 //# sourceMappingURL=terminal.js.map

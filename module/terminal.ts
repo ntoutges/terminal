@@ -1,29 +1,9 @@
-interface CommandInterface {
-  type: string,
-  flags: string[],
-  params: Record<string, string>
-};
-
-export class Command {
-  private readonly type: string;
-  private readonly flags: Set<string> = new Set<string>();
-  private readonly params: Map<string, string> = new Map<string,string>();
-  constructor({
-    type,
-    flags,
-    params
-  }: CommandInterface) {
-    this.type = type;
-
-    for (const flag of flags) { this.flags.add(flag); }
-    for (const param in params) { this.params.set(param, params[param]); }
-  }
-}
-
 type CommandListener = (text: string) => void;
 type KeyListener = (e: KeyboardEvent, text: string) => void;
+type CancelListener = () => void;
 
-const lineStylePattern = /(?:%c{(.*?)})?(.+?)(?:(?=%c{)|$)/gs; // <text>%c{<style_data>}<text> // edge case: styling cannot start on first char, need to revise RegEx pattern
+const lineStylePattern = /(?:%c{([^%]*?)})?(.+?)(?:(?=%c{)|$)/gs; // <text>%c{<style_data>}<text> // edge case: styling cannot start on first char, need to revise RegEx pattern
+const lineCarriageReturnPattern = /^.*\r/gm;
 
 export class Terminal {
   readonly els = {
@@ -41,6 +21,7 @@ export class Terminal {
 
   private readonly commandListeners: CommandListener[] = [];
   private readonly keyListeners: KeyListener[] = [];
+  private readonly cancelListeners: CancelListener[] = [];
 
   private readonly name: string; // used for local-storage shenanigans
 
@@ -49,6 +30,9 @@ export class Terminal {
 
   private commandHistory: string[] = [];
   private historyIndex: number = 0;
+
+  private isDisabled: boolean = false;
+  private readonly commandQueue: string[] = [];
 
   constructor(
     name: string,
@@ -99,11 +83,23 @@ export class Terminal {
   }
 
   private onkeydown(e: KeyboardEvent) {
+    if (e.ctrlKey && e.key == "c") { // ctrl-c
+      if (this.els.consoleInput.selectionStart == this.els.consoleInput.selectionEnd) { // only trigger stop if nothing highlighted
+        this.cancelListeners.forEach(callback => { callback() });
+        this.els.consoleInput.value += "%c{color:var(--command-err)}^C";
+        this.repeatInputText();
+        this.els.consoleInput.value = "";
+        this.enable();
+      }
+      return;
+    }
+
     if (e.key == "Enter" && !e.shiftKey) { // shift prevents command from being entered
       e.preventDefault(); // prevent "enter" key from actually doing anything
       
       const line = this.els.consoleInput.value;
-      this.commandListeners.forEach(callback => callback(line));
+      if (this.isDisabled) this.commandQueue.push(line); // push to queue to be executed later
+      else this.commandListeners.forEach(callback => callback(line)); // execute immediately
       this.pushToHistory();
       this.els.consoleInput.value = ""; // clear command line
 
@@ -176,6 +172,7 @@ export class Terminal {
 
   onCommand( callback: CommandListener ) { this.commandListeners.push(callback); }
   onKey( callback: KeyListener ) { this.keyListeners.push(callback); }
+  onCancel( callback: CancelListener ) { this.cancelListeners.push(callback); }
 
   private buildLine(sections: HTMLSpanElement[]) {
     const line = document.createElement("div");
@@ -190,7 +187,7 @@ export class Terminal {
     styleStr: string = ""
   ) {
     const section = document.createElement("span");
-    section.innerText = text;
+    section.innerText = Terminal.decode(text);
     for (const pair of styleStr.split(";")) {
       const [property,value] = pair.split(":");
       if (value === undefined) continue; // invalid property string
@@ -203,7 +200,9 @@ export class Terminal {
   // removes last line (if not a new line), then replaces
   write(text: string) {
     if (this.workingLine != null) this.workingLine.remove(); // get rid of working line
-    this.workingText += text;
+    this.workingText = (this.workingText + text).replace(lineCarriageReturnPattern, "");
+
+    // simplify \n.*\rabcd to just [abcd]
     
     const sections: HTMLSpanElement[] = [];
     for (const match of this.workingText.matchAll(lineStylePattern)) {
@@ -232,6 +231,20 @@ export class Terminal {
   writeLine(text: string) {
     this.write(text + "\n");
   }
+  disable() {
+    this.isDisabled = true;
+    this.els.inputLine.classList.add("hidden");
+  }
+  enable() {
+    this.isDisabled = false;
+    this.els.inputLine.classList.remove("hidden");
+
+    if (this.commandQueue.length > 0) { // run next queued command
+      const line = this.commandQueue.splice(0,1)[0];
+      this.commandListeners.forEach(callback => { callback(line) });
+    }
+  }
+
   clear(clearHistory: boolean = false) {
     this.els.linesHolder.innerHTML = "";
     if (this.workingLine) {
@@ -244,12 +257,16 @@ export class Terminal {
     }
   }
 
-  repeatInputText() {
-    const line = this.els.inputIndicator.innerText + this.els.consoleInput.value;
-    this.writeLine(`%c{background-color:#ffffff44}${line}`);
+  repeatInputText(altInput: string = null) {
+    const line = this.els.inputIndicator.innerText + (altInput ?? this.els.consoleInput.value);
+    // this.writeLine(`%c{background-color:#ffffff44}${line}`);
+    this.writeLine(line);
   }
 
   setIndicatorText(text: string) {
     this.els.inputIndicator.innerText = text;
   }
+
+  static encode(text: string) { return text.replace(/%c/g, "<&%_css>"); } // replace %c with some other character
+  static decode(text: string) { return text.replace(/<&%_css>/g, "%c"); }
 }

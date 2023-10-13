@@ -18,6 +18,8 @@
 
   overflow-x: hidden;
   overflow-y: auto;
+
+  --command-err: #e55050;
 }
 
 .consoles:hover {
@@ -42,13 +44,8 @@
   color: inherit;
 }
 
-.console-input-line {
-  width: 100%;
-  display: flex;
-
-  font-size: inherit;
-  font-family: inherit;
-  color: inherit;
+.console-input-line.hidden {
+  opacity: 0;
 }
 
 .console-input-indicators {

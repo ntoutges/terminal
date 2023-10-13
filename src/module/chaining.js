@@ -1,45 +1,65 @@
-class ChainLink {
-    expr;
-    constructor(expression) {
-        this.expr = expression;
+export class ChainLink {
+    expressions = [];
+    operators = [];
+    exprIndex = 0;
+    constructor(tokens) {
+        for (const token of tokens) {
+            if (token.type == "text")
+                this.expressions.push(token.value);
+            else if (token.type == "operator")
+                this.operators.push(token.value);
+        }
     }
-    toRPCN() { return this; }
+    execute(lastCommandOutput, lastCommandStatus // true -> success, false -> fail
+    ) {
+        const output = {
+            command: null,
+            input: "",
+            output: lastCommandOutput
+        };
+        if (this.exprIndex >= this.expressions.length)
+            return output;
+        if (this.exprIndex == 0)
+            output.command = this.expressions[this.exprIndex]; // first expression ALWAYS evaluates
+        else {
+            const operator = this.operators[this.exprIndex - 1];
+            const potentialCommand = this.expressions[this.exprIndex];
+            switch (operator) {
+                case "&&": // run only if last succeeds
+                    if (lastCommandStatus)
+                        output.command = potentialCommand;
+                    break;
+                case "||": // run only if last fails
+                    if (!lastCommandStatus)
+                        output.command = potentialCommand;
+                    break;
+                case ";": // run after last
+                    output.command = potentialCommand;
+                    break;
+                case "|": // pipe output of last in as input for this (implied that this only runs if the last succeeds)
+                    if (lastCommandStatus) {
+                        output.command = potentialCommand;
+                        output.input = lastCommandOutput;
+                        output.output = "";
+                    }
+                    break;
+                default:
+                    throw new Error(`Unknown Operator: \"${operator}\"`);
+            }
+        }
+        this.exprIndex++;
+        return output;
+    }
 }
-class ChainOperator {
-    operator;
-    constructor(operator) {
-        this.operator = operator;
-    }
-    toRPCN() { return this; }
-}
-class ChainConnection {
-    expr1 = null;
-    expr2 = null;
-    operator;
-    constructor({ expr1, expr2, operator }) {
-        this.operator = operator;
-        this.expr1 = expr1;
-        this.expr2 = expr2;
-    }
-    /*
-      [expr2] acts as an operator, using [expr1] and [operator] to determine if it should run or not
-      As such, [expr2] is treated as the operator in this form of RPN (RPCN)
-    */
-    toRPCN() {
-        return [].concat(this.expr1.toRPCN(), this.operator.toRPCN(), this.expr2.toRPCN());
-    }
-}
-function createChain(text, splitters, encapsulators // key,value pairs storing characters that prevent chaining between them; eg: "{": "}"
+export function createChain(text, splitters, encapsulators // key,value pairs storing characters that prevent chaining between them; eg: "{": "}"
 ) {
-    let encapsulatorEnd = null; // implies that currently not encapsulated
-    let startI = 0;
-    let i = 0;
-    // while (i < text.length) {
-    //   const char = text[i];
-    //   if (char in encapsulators) {
-    //   }
-    // }
+    const tokens = tokenize(text, splitters, encapsulators, false); // parentheses disabled due to strange behaviour
+    const errMsg = verifyTokenIntegrity(tokens);
+    if (errMsg != "")
+        throw new Error(`Tokenization Error: ${errMsg}`);
+    return new ChainLink(tokens);
 }
+// split string into two types of tokens, split by the [splitters] inputs
 function tokenize(text, splitters, encapsulators, // key,value pairs storing characters that prevent chaining between them; eg: "{": "}"
 doParentheticals = false) {
     splitters = splitters.slice(0).sort((a, b) => { return b.length - a.length; }); // put longer strings at the front
@@ -125,6 +145,7 @@ doParentheticals = false) {
                 continue;
             }
             if (splitterFirstChars.has(char)) {
+                let wasSplitter = false;
                 for (const splitterIndex of splitterFirstChars.get(char)) {
                     const pattern = splitters[splitterIndex];
                     const reference = text.substring(i, i + pattern.length);
@@ -140,9 +161,12 @@ doParentheticals = false) {
                         // advance indices
                         i += pattern.length;
                         startI = i;
+                        wasSplitter = true;
                         break;
                     }
                 }
+                if (!wasSplitter)
+                    i++;
             }
             else {
                 i++;
@@ -161,11 +185,24 @@ doParentheticals = false) {
         consolidateTokens();
         depth--;
     }
-    return tokens[0];
+    return tokens[0] ?? []; // no tokens means just return an empty list
 }
-const text = "a && (b || c)";
-console.log(tokenize(text, ["&", "&&", "||"], {
-    "\"": "\"",
-    "'": "'"
-}, true));
+// ensure token sequence in chain makes sense:
+// - every [operator] token is surrounded by a [text] token
+// - every [text] token is either (at the start of the sequence), (at the end of the sequence), or (surrounded by [operator] tokens)
+function verifyTokenIntegrity(tokens) {
+    if (tokens.length != 0 && tokens.length % 2 != 1)
+        return "Invalid token length."; // tokens must always be odd length, because the addition of each [operator] token must also add a [text] token
+    for (let i = 0; i < tokens.length; i++) {
+        if (i % 2 == 0) { // this should be a [text] token
+            if (tokens[i].type != "text")
+                return "Invalid repetition of text tokens.";
+        }
+        else { // this should be a [operator] token
+            if (tokens[i].type != "operator")
+                return "Invalid repetition of operator tokens.";
+        }
+    }
+    return ""; // empty string signifies no error
+}
 //# sourceMappingURL=chaining.js.map
