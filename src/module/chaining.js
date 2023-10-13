@@ -30,8 +30,11 @@ export class ChainLink {
                         output.command = potentialCommand;
                     break;
                 case "||": // run only if last fails
-                    if (!lastCommandStatus)
+                    if (!lastCommandStatus) {
                         output.command = potentialCommand;
+                        output.input = lastCommandOutput; // pour error message into this
+                        output.output = "";
+                    }
                     break;
                 case ";": // run after last
                     output.command = potentialCommand;

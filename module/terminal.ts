@@ -40,6 +40,7 @@ export class Terminal {
   ) {
     this.name = name;
     this.els.body.classList.add("consoles");
+    this.els.consoleInput.setAttribute("autofocus", "1");
     
     this.els.linesHolder.classList.add("console-line-holders");
     this.els.inputLine.classList.add("console-input-line");
@@ -148,9 +149,9 @@ export class Terminal {
       this.commandHistory.length == 0 // always push to empty history
       || this.els.consoleInput.value != this.commandHistory[this.commandHistory.length-1]) { // don't push if same as last element
       this.commandHistory.push(this.els.consoleInput.value);
-      this.historyIndex = this.commandHistory.length;
       localStorage.setItem(`console-${this.name}`, JSON.stringify(this.commandHistory));
     }
+    this.historyIndex = this.commandHistory.length;
   }
 
   private resizeInput() {
@@ -225,7 +226,7 @@ export class Terminal {
 
       const lines = text.split("\n"); // split over new lines
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].trim().length > 0) {
+        if (lines[i].length > 0) {
           sections.push(
             this.buildSection(
               lines[i],
@@ -244,7 +245,7 @@ export class Terminal {
 
     this.els.body.scrollTo(0, this.els.body.scrollHeight);
   }
-  printLine(text: string) {
+  println(text: string) {
     this.print(text + "\n");
   }
   disable() {
@@ -274,9 +275,9 @@ export class Terminal {
   }
 
   repeatInputText(altInput: string = null) {
-    const line = this.els.inputIndicator.innerText + (altInput ?? this.els.consoleInput.value);
+    const line = Terminal.encode(this.els.inputIndicator.innerText + (altInput ?? this.els.consoleInput.value));
     // this.printLine(`%c{background-color:#ffffff44}${line}`);
-    this.printLine(line);
+    this.println(line);
   }
 
   setIndicatorText(text: string) {
@@ -285,4 +286,13 @@ export class Terminal {
 
   static encode(text: string) { return text.replace(/%c/g, "<&%_css>"); } // replace %c with some other character
   static decode(text: string) { return text.replace(/<&%_css>/g, "%c"); }
+
+  static simplify(text: string) { // remote formatting information
+    let finalStr = "";
+    text += " "; // ensure text doesn't end with %c{} (this breaks pattern) is not 
+    for (const match of text.matchAll(lineStylePattern)) {
+      finalStr += match[2];
+    }
+    return finalStr.substring(0,finalStr.length-1); // remove added trailing space
+  }
 }

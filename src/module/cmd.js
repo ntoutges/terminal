@@ -17,13 +17,15 @@ export class Command {
             this.args.set(arg, args[arg]);
         }
     }
-    isSet(flag) { return this.flags.has(flag); }
+    hasFlag(flag) { return this.flags.has(flag); }
     getParam(arg, fallback = null) {
         if (this.args.has(arg))
             return this.args.get(arg); // return paramater that DOES exist
         else
             return fallback; // return default value if doesn't exist
     }
+    setParam(arg, value) { this.args.set(arg, value); }
+    hasParam(arg) { return this.args.has(arg); }
     cancel() { this._isCanceled = true; }
     get isCanceled() { return this._isCanceled; }
 }
@@ -43,7 +45,7 @@ export class SimpleShell {
             chain = createChain(text, splitters, encapsulators);
         }
         catch (err) {
-            this.terminal.printLine(`%c{color:var(--console-err)}${err.message}`);
+            this.terminal.println(`%c{color:var(--console-err)}${err.message}`);
             return;
         }
         this.terminal.disable();
@@ -63,13 +65,13 @@ export class SimpleShell {
         const cmdData = chain.execute(lastOutput, lastStatus);
         if (cmdData.command == null) { // finished--print output
             if (lastOutput.length > 0)
-                this.terminal.printLine(lastOutput);
+                this.terminal.println(lastOutput);
             this.currentCommand = null; // reset
             this.terminal.enable();
             return;
         }
         if (cmdData.output)
-            this.terminal.printLine(cmdData.output); // next command doesn't use this, so print it out
+            this.terminal.println(cmdData.output); // next command doesn't use this, so print it out
         const parts = this.extractText(cmdData.command);
         const name = parts[0];
         if (this.commands.has(name)) {
@@ -82,7 +84,13 @@ export class SimpleShell {
                     args: data.args
                 });
                 this.currentCommand = command;
-                this.commands.get(name).execute(command, this.terminal, cmdData.input).then((output) => {
+                const cmdObject = this.commands.get(name);
+                if ("validate" in cmdObject) {
+                    let response = cmdObject.validate.call(this, command);
+                    if (response)
+                        throw new Error(response);
+                }
+                cmdObject.execute.call(this, command, this.terminal, cmdData.input).then((output) => {
                     if (command.isCanceled)
                         return; // refer to local because global will likely be reassigned
                     this.runCommand(chain, output, true);
@@ -93,7 +101,7 @@ export class SimpleShell {
                 });
             }
             catch (err) {
-                this.runCommand(chain, "%c{color:var(--command-err)}" + err.toString(), false);
+                this.runCommand(chain, "%c{color:var(--command-err)}" + err.message, false);
             }
         }
         else {
@@ -172,7 +180,7 @@ export class SimpleShell {
         if (argCt > argKeys.length) {
             throw new Error("Too many arguments given.");
         }
-        if (argCt > argKeys.length) {
+        if (argCt < argKeys.length) {
             throw new Error("Not enough arguments given.");
         }
         return {
@@ -180,17 +188,27 @@ export class SimpleShell {
             flags
         };
     }
-    addCommand(name, cmdData) {
+    addCommand(name, cmdData, module = "") {
         if (!("flags" in cmdData))
             cmdData.flags = {};
         if (!("oargs" in cmdData))
-            cmdData.flags = {};
-        this.commands.set(name, cmdData); // completely willing to override old command names
+            cmdData.oargs = {};
+        const fullName = module ? module + "." + name : name;
+        this.commands.set(fullName, cmdData); // completely willing to override old command names
     }
-    addCommands(cmdDatas) {
-        for (const name in cmdDatas) {
-            this.addCommand(name, cmdDatas[name]);
+    addModule(module, moduleData) {
+        for (const name in moduleData) {
+            this.addCommand(name, moduleData[name], module);
         }
+    }
+    isCommand(command) { return this.commands.has(command); }
+    getCommand(command) { return this.commands.get(command); }
+    getCommands() {
+        const commandList = [];
+        for (const command of this.commands.keys()) {
+            commandList.push(command);
+        }
+        return commandList;
     }
 }
 //# sourceMappingURL=cmd.js.map

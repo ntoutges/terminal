@@ -26,11 +26,13 @@ export class Command {
     for (const arg in args) { this.args.set(arg, args[arg]); }
   }
 
-  isSet(flag: string) { return this.flags.has(flag); }
+  hasFlag(flag: string) { return this.flags.has(flag); }
   getParam(arg: string, fallback: string = null) {
     if (this.args.has(arg)) return this.args.get(arg); // return paramater that DOES exist
     else return fallback; // return default value if doesn't exist
   }
+  setParam(arg: string, value: string) { this.args.set(arg, value); }
+  hasParam(arg: string) { return this.args.has(arg); }
 
   cancel() { this._isCanceled = true; }
   get isCanceled() { return this._isCanceled; }
@@ -62,7 +64,7 @@ export class SimpleShell {
     let chain: ChainLink;
     try { chain = createChain(text, splitters, encapsulators); }
     catch(err) {
-      this.terminal.printLine(`%c{color:var(--console-err)}${err.message}`);
+      this.terminal.println(`%c{color:var(--console-err)}${err.message}`);
       return;
     }
 
@@ -93,12 +95,12 @@ export class SimpleShell {
 
     const cmdData = chain.execute( lastOutput, lastStatus );
     if (cmdData.command == null) { // finished--print output
-      if (lastOutput.length > 0) this.terminal.printLine(lastOutput);
+      if (lastOutput.length > 0) this.terminal.println(lastOutput);
       this.currentCommand = null; // reset
       this.terminal.enable();
       return;
     }
-    if (cmdData.output) this.terminal.printLine(cmdData.output); // next command doesn't use this, so print it out
+    if (cmdData.output) this.terminal.println(cmdData.output); // next command doesn't use this, so print it out
 
     const parts = this.extractText(cmdData.command);
     const name = parts[0];
@@ -118,7 +120,13 @@ export class SimpleShell {
         });
         this.currentCommand = command;
 
-        this.commands.get(name).execute(command, this.terminal, cmdData.input).then((output) => {
+        const cmdObject = this.commands.get(name);
+
+        if ("validate" in cmdObject) {
+          let response = cmdObject.validate.call(this,command);
+          if (response) throw new Error(response);
+        }
+        cmdObject.execute.call(this,command, this.terminal, cmdData.input).then((output) => {
           if (command.isCanceled) return; // refer to local because global will likely be reassigned
           this.runCommand(
             chain,
@@ -137,7 +145,7 @@ export class SimpleShell {
       catch (err) {
         this.runCommand(
           chain,
-          "%c{color:var(--command-err)}" + err.toString(),
+          "%c{color:var(--command-err)}" + err.message,
           false
         );
       }
@@ -227,7 +235,7 @@ export class SimpleShell {
     }
 
     if (argCt > argKeys.length) { throw new Error("Too many arguments given."); }
-    if (argCt > argKeys.length) { throw new Error("Not enough arguments given."); }
+    if (argCt < argKeys.length) { throw new Error("Not enough arguments given."); }
 
     return {
       args,
@@ -235,12 +243,22 @@ export class SimpleShell {
     };
   }
 
-  addCommand(name: string, cmdData: CommandStructure) {
+  addCommand(name: string, cmdData: CommandStructure, module:string="") {
     if (!("flags" in cmdData)) cmdData.flags = {};
-    if (!("oargs" in cmdData)) cmdData.flags = {};
-    this.commands.set(name, cmdData); // completely willing to override old command names
+    if (!("oargs" in cmdData)) cmdData.oargs = {};
+    
+    const fullName = module ? module + "." + name : name;
+    this.commands.set(fullName, cmdData); // completely willing to override old command names
   }
-  addCommands(cmdDatas: Record<string, CommandStructure>) {
-    for (const name in cmdDatas) { this.addCommand(name, cmdDatas[name]); }
+  addModule(module: string, moduleData: Record<string, CommandStructure>) {
+    for (const name in moduleData) { this.addCommand(name, moduleData[name], module); }
+  }
+
+  isCommand(command: string) { return this.commands.has(command); }
+  getCommand(command: string) { return this.commands.get(command); }
+  getCommands() { // return list of all commands
+    const commandList: string[] = [];
+    for (const command of this.commands.keys()) { commandList.push(command); }
+    return commandList;
   }
 }
