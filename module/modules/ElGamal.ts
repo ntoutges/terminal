@@ -59,8 +59,8 @@ export const module: Record<string, CommandStructure> = {
 
 function privateValidate(command: Command) {
   try {
-    const p = parseInt(command.getParam("p"),10);
-    command.setParam("p", p.toString(10));
+    const p = parseInt(command.getArg("p"),10);
+    command.setArg("p", p.toString(10));
     return "";
   }
   catch (_) { return `Invalid arguments`; }
@@ -68,7 +68,7 @@ function privateValidate(command: Command) {
 
 function privateExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
-    const p = BigInt(command.getParam("p"));
+    const p = BigInt(command.getArg("p"));
     const b = generatePrivateKey(p);
 
     if (command.hasFlag("v")) terminal.println(`Picking psuedo-random number in range [1,${p}-1]`); // verbose
@@ -78,13 +78,13 @@ function privateExecute(command: Command, terminal: Terminal, input:string="") {
 
 function publicValidate(command: Command) {
   try {
-    const p = BigInt(command.getParam("p"));
-    const r = BigInt(command.getParam("r"));
-    const b = BigInt(command.getParam("b"));
+    const p = BigInt(command.getArg("p"));
+    const r = BigInt(command.getArg("r"));
+    const b = BigInt(command.getArg("b"));
 
-    command.setParam("p", p.toString());
-    command.setParam("r", r.toString());
-    command.setParam("b", b.toString());
+    command.setArg("p", p.toString());
+    command.setArg("r", r.toString());
+    command.setArg("b", b.toString());
     return "";
   }
   catch (_) { return `Invalid arguments`; }
@@ -92,9 +92,9 @@ function publicValidate(command: Command) {
 
 function publicExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
-    const p = BigInt(command.getParam("p"));
-    const r = BigInt(command.getParam("r"));
-    const b = BigInt(command.getParam("b"));
+    const p = BigInt(command.getArg("p"));
+    const r = BigInt(command.getArg("r"));
+    const b = BigInt(command.getArg("b"));
 
     const B = generatePublicKey(p,r,b);
     
@@ -105,23 +105,23 @@ function publicExecute(command: Command, terminal: Terminal, input:string="") {
 
 function encryptValidate(command: Command) {
   try {
-    const p = BigInt(command.getParam("p"));
-    const r = BigInt(command.getParam("r"));
-    const B = BigInt(command.getParam("B"));
-    const m = BigInt(command.getParam("m"));
+    const p = BigInt(command.getArg("p"));
+    const r = BigInt(command.getArg("r"));
+    const B = BigInt(command.getArg("B"));
+    const m = BigInt(command.getArg("m"));
 
     const a = BigInt(
-      command.getParam(
+      command.getArg(
         "a",
         Math.floor(Math.random() * parseInt(p.toString())).toString()
       )
     );
     
-    command.setParam("p", p.toString());
-    command.setParam("r", r.toString());
-    command.setParam("B", B.toString());
-    command.setParam("m", m.toString());
-    command.setParam("a", a.toString());
+    command.setArg("p", p.toString());
+    command.setArg("r", r.toString());
+    command.setArg("B", B.toString());
+    command.setArg("m", m.toString());
+    command.setArg("a", a.toString());
     return "";
   }
   catch (_) { return `Invalid arguments`; }
@@ -129,11 +129,11 @@ function encryptValidate(command: Command) {
 
 function encryptExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
-    const p = BigInt(command.getParam("p"));
-    const r = BigInt(command.getParam("r"));
-    const B = BigInt(command.getParam("B"));
-    const m = BigInt(command.getParam("m"));
-    const a = BigInt(command.getParam("a"));
+    const p = BigInt(command.getArg("p"));
+    const r = BigInt(command.getArg("r"));
+    const B = BigInt(command.getArg("B"));
+    const m = BigInt(command.getArg("m"));
+    const a = BigInt(command.getArg("a"));
 
     const { M,A } = encrypt(p,r,B,m, a);
 
@@ -151,15 +151,15 @@ function encryptExecute(command: Command, terminal: Terminal, input:string="") {
 
 function decryptValidate(command: Command) {
   try {
-    const p = BigInt(command.getParam("p"));
-    const b = BigInt(command.getParam("b"));
-    const M = BigInt(command.getParam("M"));
-    const A = BigInt(command.getParam("A"));
+    const p = BigInt(command.getArg("p"));
+    const b = BigInt(command.getArg("b"));
+    const M = BigInt(command.getArg("M"));
+    const A = BigInt(command.getArg("A"));
     
-    command.setParam("p", p.toString());
-    command.setParam("b", b.toString());
-    command.setParam("M", M.toString());
-    command.setParam("A", A.toString());
+    command.setArg("p", p.toString());
+    command.setArg("b", b.toString());
+    command.setArg("M", M.toString());
+    command.setArg("A", A.toString());
     return "";
   }
   catch (_) { return `Invalid arguments`; }
@@ -167,14 +167,14 @@ function decryptValidate(command: Command) {
 
 function decryptExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
-    const p = BigInt(command.getParam("p"));
-    const b = BigInt(command.getParam("b"));
-    const M = BigInt(command.getParam("M"));
-    const A = BigInt(command.getParam("A"));
+    const p = BigInt(command.getArg("p"));
+    const b = BigInt(command.getArg("b"));
+    const M = BigInt(command.getArg("M"));
+    const A = BigInt(command.getArg("A"));
 
     const m = decrypt(p,b,M,A)
 
-    if (command.getParam("v")) terminal.println(`Evaluating %c(color:orange)(${M}*${A}^(${p}-1-${b}))%c(color:unset) with modulus of '${p}'`)
+    if (command.getArg("v")) terminal.println(`Evaluating %c(color:orange)(${M}*${A}^(${p}-1-${b}))%c(color:unset) with modulus of '${p}'`)
     resolve(m.toString());
   });
 }

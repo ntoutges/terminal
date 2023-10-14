@@ -1,5 +1,6 @@
 import { ChainLink, createChain } from "./chaining.js";
 import { Terminal } from "./terminal.js";
+import { FileSystem } from "./drive.js";
 
 const splitters = ["||","&&","|",";"];
 const encapsulators = { "\"": "\"", "'": "'" };
@@ -14,6 +15,7 @@ export class Command {
   private readonly type: string;
   private readonly flags: Set<string> = new Set<string>();
   private readonly args: Map<string, string> = new Map<string,string>();
+  private readonly temps: Map<string,any> = new Map<string,any>(); // used mainly by validate functions--parsing data means they may as well interpret results as well
   private _isCanceled: boolean = false;
   endText: string = "\n";
   constructor({
@@ -28,12 +30,19 @@ export class Command {
   }
 
   hasFlag(flag: string) { return this.flags.has(flag); }
-  getParam(arg: string, fallback: string = null) {
+  getArg(arg: string, fallback: string = null) {
     if (this.args.has(arg)) return this.args.get(arg); // return paramater that DOES exist
     else return fallback; // return default value if doesn't exist
   }
-  setParam(arg: string, value: string) { this.args.set(arg, value); }
-  hasParam(arg: string) { return this.args.has(arg); }
+  setArg(arg: string, value: string) { this.args.set(arg, value); }
+  hasArg(arg: string) { return this.args.has(arg); }
+
+  getTemp(temp:string, fallback:string = null) {
+    if (this.temps.has(temp)) return this.temps.get(temp);
+    else return fallback; // return default value if doesn't exist
+  }
+  setTemp(temp:string, value:any) { this.temps.set(temp,value); }
+  hasTemp(temp:string) { return this.temps.has(temp); }
 
   cancel() { this._isCanceled = true; }
   get isCanceled() { return this._isCanceled; }
@@ -51,6 +60,7 @@ export class SimpleShell {
   protected readonly terminal: Terminal;
   protected readonly commands: Map<string,CommandStructure> = new Map<string,CommandStructure>();
   protected currentCommand: Command = null;
+  private readonly fs = new FileSystem("C");
 
   constructor(
     terminal: Terminal
@@ -137,7 +147,8 @@ export class SimpleShell {
             output,
             true
           );
-        }).catch(output => {
+        }).catch((output:string) => {
+          debugger
           if (command.isCanceled) return; // refer to local because global will likely be reassigned
           if (output.length > 0) output += command.endText;
           this.runCommand(
@@ -256,8 +267,9 @@ export class SimpleShell {
     const fullName = module ? module + "." + name : name;
     this.commands.set(fullName, cmdData); // completely willing to override old command names
   }
-  addModule(module: string, moduleData: Record<string, CommandStructure>) {
+  addModule(module: string, moduleData: Record<string, CommandStructure>, init:()=>void = null) {
     for (const name in moduleData) { this.addCommand(name, moduleData[name], module); }
+    if (init) init.call(this);
   }
 
   isCommand(command: string) { return this.commands.has(command); }

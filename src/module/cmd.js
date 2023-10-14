@@ -1,5 +1,6 @@
 import { createChain } from "./chaining.js";
 import { Terminal } from "./terminal.js";
+import { FileSystem } from "./drive.js";
 const splitters = ["||", "&&", "|", ";"];
 const encapsulators = { "\"": "\"", "'": "'" };
 ;
@@ -7,6 +8,7 @@ export class Command {
     type;
     flags = new Set();
     args = new Map();
+    temps = new Map(); // used mainly by validate functions--parsing data means they may as well interpret results as well
     _isCanceled = false;
     endText = "\n";
     constructor({ type, flags, args }) {
@@ -19,14 +21,22 @@ export class Command {
         }
     }
     hasFlag(flag) { return this.flags.has(flag); }
-    getParam(arg, fallback = null) {
+    getArg(arg, fallback = null) {
         if (this.args.has(arg))
             return this.args.get(arg); // return paramater that DOES exist
         else
             return fallback; // return default value if doesn't exist
     }
-    setParam(arg, value) { this.args.set(arg, value); }
-    hasParam(arg) { return this.args.has(arg); }
+    setArg(arg, value) { this.args.set(arg, value); }
+    hasArg(arg) { return this.args.has(arg); }
+    getTemp(temp, fallback = null) {
+        if (this.temps.has(temp))
+            return this.temps.get(temp);
+        else
+            return fallback; // return default value if doesn't exist
+    }
+    setTemp(temp, value) { this.temps.set(temp, value); }
+    hasTemp(temp) { return this.temps.has(temp); }
     cancel() { this._isCanceled = true; }
     get isCanceled() { return this._isCanceled; }
 }
@@ -34,6 +44,7 @@ export class SimpleShell {
     terminal;
     commands = new Map();
     currentCommand = null;
+    fs = new FileSystem("C");
     constructor(terminal) {
         this.terminal = terminal;
         this.terminal.onCommand(this.onCommand.bind(this));
@@ -98,7 +109,8 @@ export class SimpleShell {
                     if (output.length > 0)
                         output += command.endText;
                     this.runCommand(chain, output, true);
-                }).catch(output => {
+                }).catch((output) => {
+                    debugger;
                     if (command.isCanceled)
                         return; // refer to local because global will likely be reassigned
                     if (output.length > 0)
@@ -204,10 +216,12 @@ export class SimpleShell {
         const fullName = module ? module + "." + name : name;
         this.commands.set(fullName, cmdData); // completely willing to override old command names
     }
-    addModule(module, moduleData) {
+    addModule(module, moduleData, init = null) {
         for (const name in moduleData) {
             this.addCommand(name, moduleData[name], module);
         }
+        if (init)
+            init.call(this);
     }
     isCommand(command) { return this.commands.has(command); }
     getCommand(command) { return this.commands.get(command); }

@@ -58,8 +58,8 @@ export const module: Record<string, CommandStructure> = {
 
 function echoExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
-    command.endText = command.getParam("l","\n");
-    let text = (input + command.getParam("e","")).replaceAll("\\r", "\r").replaceAll("\\n", "\n");
+    command.endText = command.getArg("l","\n");
+    let text = (input + command.getArg("e","")).replaceAll("\\r", "\r").replaceAll("\\n", "\n");
     if (command.hasFlag("U")) text = text.toUpperCase();
     else if (command.hasFlag("l")) text = text.toLowerCase();
     
@@ -68,19 +68,19 @@ function echoExecute(command: Command, terminal: Terminal, input:string="") {
 }
 
 function delayValidate(command: Command): string {
-  const integer = parseFloat(command.getParam("delay", "0"));
-  const unit = command.getParam("unit", "ms");
+  const integer = parseFloat(command.getArg("delay", "0"));
+  const unit = command.getArg("unit", "ms");
 
   if (isNaN(integer) || integer < 0) return "Invalid delay value.";
-  command.setParam("delay", integer.toString());
+  command.setArg("delay", integer.toString());
   if (!["ms","s","min","h"].includes(unit)) return "Invalid unit";
   return "";
 }
 
 function delayExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
-    let delay = parseFloat(command.getParam("delay"));
-    switch (command.getParam("unit")) {
+    let delay = parseFloat(command.getArg("delay"));
+    switch (command.getArg("unit")) {
       case "s":
         delay *= 1000;
         break;
@@ -116,7 +116,7 @@ function delayExecute(command: Command, terminal: Terminal, input:string="") {
 }
 
 function helpValidate(command: Command) {
-  const cmd = command.getParam("command");
+  const cmd = command.getArg("command");
   if (!this.isCommand(cmd)) return `Invalid command \"${cmd}\"`;
   return "";
 }
@@ -124,8 +124,8 @@ function helpValidate(command: Command) {
 const helpColors = [ '#88feff', '#88b7ff', '#fff788', '#d288ff', '#88ffb3', '#ff8888', '#b5ff88'];
 function helpExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
-    const name = command.getParam("command");
-    const cmd = this.getCommand(command.getParam("command")) as CommandStructure;
+    const name = command.getArg("command");
+    const cmd = this.getCommand(command.getArg("command")) as CommandStructure;
 
     let finalStr = "";
 
@@ -173,10 +173,10 @@ function helpGetColor(i: number) {
 
 function listValidate(command: Command) {
   if (command.hasFlag("r")) { // ensure regex works
-    try { new RegExp(command.getParam("pattern")); }
+    try { new RegExp(command.getArg("pattern")); }
     catch(regexErr) { return regexErr.message; }
   }
-  else if (command.hasFlag("i")) command.setParam("pattern", command.getParam("pattern", "").toLowerCase()); // lowercase everything in prep for case-insensitive search
+  else if (command.hasFlag("i")) command.setArg("pattern", command.getArg("pattern", "").toLowerCase()); // lowercase everything in prep for case-insensitive search
   return "";
 }
 
@@ -187,7 +187,7 @@ function listExecute(command: Command, terminal: Terminal, input:string="") {
     const ignoreCase = command.hasFlag("i");
 
     if (command.hasFlag("r")) {
-      const pattern = new RegExp(command.getParam("pattern"), ignoreCase ? "i" : "");
+      const pattern = new RegExp(command.getArg("pattern"), ignoreCase ? "i" : "");
       for (const command of commandList) {
         const matchData = command.match(pattern);
         if (matchData) {
@@ -204,7 +204,7 @@ function listExecute(command: Command, terminal: Terminal, input:string="") {
       }
     }
     else {
-      const pattern = command.getParam("pattern");
+      const pattern = command.getArg("pattern");
       for (const command of commandList) { 
         if (command.includes(pattern)) {
           if (pattern.length == 0) matchingCommands.push( `%c{color:#86f785}${command}%c{}` );

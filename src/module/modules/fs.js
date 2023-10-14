@@ -1,6 +1,5 @@
 import { Terminal } from "../terminal.js";
-import { FileSystem, FileTypes } from "../drive.js";
-const fs = new FileSystem("C");
+import { FileTypes } from "../drive.js";
 export const name = "fs";
 export const module = {
     "cd": {
@@ -56,8 +55,8 @@ export const module = {
 function cdExecute(command, terminal, input = "") {
     return new Promise((resolve, reject) => {
         try {
-            fs.cd(command.getParam("path"));
-            terminal.setIndicatorText(fs.pathString + ">");
+            this.fs.cd(command.getArg("path"));
+            terminal.setIndicatorText(this.fs.pathString + ">");
             resolve("");
         }
         catch (err) {
@@ -68,7 +67,7 @@ function cdExecute(command, terminal, input = "") {
 function lsExecute(command, terminal, input = "") {
     return new Promise((resolve, reject) => {
         try {
-            const items = fs.ls(command.getParam("l", null)).sort((a, b) => {
+            const items = this.fs.ls(command.getArg("l", null)).sort((a, b) => {
                 if (a.type != b.type) { // arrange folders at the top
                     if (a.type == FileTypes.Folder)
                         return -1;
@@ -95,7 +94,7 @@ function lsExecute(command, terminal, input = "") {
 function catExecute(command, terminal, input = "") {
     return new Promise((resolve, reject) => {
         try {
-            const content = fs.read(command.getParam("filename"));
+            const content = this.fs.read(command.getArg("filename"));
             if (command.hasFlag("r"))
                 resolve(Terminal.simplify(content));
             else if (command.hasFlag("s"))
@@ -111,8 +110,8 @@ function catExecute(command, terminal, input = "") {
 function saveExecute(command, terminal, input = "") {
     return new Promise((resolve, reject) => {
         try {
-            const data = input + command.getParam("d", "");
-            fs.save(command.getParam("name"), data, command.hasFlag("a"));
+            const data = input + command.getArg("d", "");
+            this.fs.save(command.getArg("name"), data, command.hasFlag("a"));
             resolve("");
         }
         catch (err) {
@@ -123,7 +122,7 @@ function saveExecute(command, terminal, input = "") {
 function mkdirExecute(command, terminal, input = "") {
     return new Promise((resolve, reject) => {
         try {
-            fs.mkdir(command.getParam("name"));
+            this.fs.mkdir(command.getArg("name"));
             resolve("");
         }
         catch (err) {
@@ -134,8 +133,8 @@ function mkdirExecute(command, terminal, input = "") {
 function rmExecute(command, terminal, input = "") {
     return new Promise((resolve, reject) => {
         try {
-            fs.rm(command.getParam("name"), command.hasFlag("r"));
-            terminal.setIndicatorText(fs.pathString + ">"); // location may have changed
+            this.fs.rm(command.getArg("name"), command.hasFlag("r"));
+            terminal.setIndicatorText(this.fs.pathString + ">"); // location may have changed
             resolve("");
         }
         catch (err) {
