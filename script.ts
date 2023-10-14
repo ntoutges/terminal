@@ -13,3 +13,5 @@ const s = new SimpleShell(t);
 s.addModule("", test.module);
 s.addModule(eg.name, eg.module);
 s.addModule("", fs.module)
+
+t.setIndicatorText("C:/>")

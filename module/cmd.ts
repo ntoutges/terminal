@@ -139,6 +139,7 @@ export class SimpleShell {
           );
         }).catch(output => {
           if (command.isCanceled) return; // refer to local because global will likely be reassigned
+          if (output.length > 0) output += command.endText;
           this.runCommand(
             chain,
             output,
@@ -149,7 +150,7 @@ export class SimpleShell {
       catch (err) {
         this.runCommand(
           chain,
-          "%c{color:var(--command-err)}" + err.message,
+          "%c{color:var(--command-err)}" + err.message + "\n",
           false
         );
       }
@@ -157,7 +158,7 @@ export class SimpleShell {
     else {
       this.runCommand(
         chain,
-        `%c{color:var(--command-err)}The command \"${Terminal.encode(name)}\" does not exist.`,
+        `%c{color:var(--command-err)}The command \"${Terminal.encode(name)}\" does not exist.\n`,
         false
       );
     }

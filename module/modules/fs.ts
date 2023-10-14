@@ -72,7 +72,13 @@ function cdExecute(command: Command, terminal: Terminal, input:string="") {
 function lsExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
     try {
-      const items = fs.ls(command.getParam("l", null));
+      const items = fs.ls(command.getParam("l", null)).sort((a,b) => {
+        if (a.type != b.type) { // arrange folders at the top
+          if (a.type == FileTypes.Folder) return -1;
+          return 1;
+        }
+        return a.name < b.name ? -1 : 1; // arrange names by alphabet
+      });
 
       const output: string[] = [];
       for (const item of items) {

@@ -3,6 +3,7 @@ type KeyListener = (e: KeyboardEvent, text: string) => void;
 type CancelListener = () => void;
 
 const lineStylePattern = /(?:%c{([^%]*?)})?(.+?)(?:(?=%c{)|$)/gs; // <text>%c{<style_data>}<text> // edge case: styling cannot start on first char, need to revise RegEx pattern
+const lineStartsWithStylePattern = /^%c{.*}/gs
 const lineCarriageReturnPattern = /^.*\r/gm;
 
 export class Terminal {
@@ -256,13 +257,21 @@ export class Terminal {
         }
         if (i+1 < lines.length) { // not last itteration
           this.workingLine = this.buildLine(sections); // build new line
-          this.allText += `%c{${style}}${lines[i]}\n`;
           sections.splice(0); // clear list for clean slate
         }
       }
     }
+
+    const newlineIndex = this.workingText.lastIndexOf("\n")
+
     this.workingLine = this.buildLine(sections); // reassign working line to new line
-    this.workingText = this.workingText.substring(this.workingText.lastIndexOf("\n")+1);
+    
+    if (newlineIndex != -1) {
+      const newText = this.workingText.substring(0,newlineIndex+1);
+      if (newText.match(lineStartsWithStylePattern)) this.allText += newText;
+      else this.allText += "%c{}" + newText;
+    } 
+    this.workingText = this.workingText.substring(newlineIndex+1);
     
     this.els.body.scrollTo(0, this.els.body.scrollHeight);
     this.saveConsoleState();

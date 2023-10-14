@@ -101,15 +101,17 @@ export class SimpleShell {
                 }).catch(output => {
                     if (command.isCanceled)
                         return; // refer to local because global will likely be reassigned
+                    if (output.length > 0)
+                        output += command.endText;
                     this.runCommand(chain, output, false);
                 });
             }
             catch (err) {
-                this.runCommand(chain, "%c{color:var(--command-err)}" + err.message, false);
+                this.runCommand(chain, "%c{color:var(--command-err)}" + err.message + "\n", false);
             }
         }
         else {
-            this.runCommand(chain, `%c{color:var(--command-err)}The command \"${Terminal.encode(name)}\" does not exist.`, false);
+            this.runCommand(chain, `%c{color:var(--command-err)}The command \"${Terminal.encode(name)}\" does not exist.\n`, false);
         }
     }
     extractText(text) {
