@@ -1,7 +1,7 @@
 import { Command, CommandStructure } from "../cmd.js";
 import { Terminal } from "../terminal.js";
 
-export const name = "";
+export const name = "global";
 
 export const module: Record<string, CommandStructure> = {
   "echo": {

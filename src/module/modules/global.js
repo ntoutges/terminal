@@ -1,4 +1,4 @@
-export const name = "";
+export const name = "global";
 export const module = {
     "echo": {
         args: {},

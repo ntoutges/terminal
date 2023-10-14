@@ -39,7 +39,7 @@ export class SimpleShell {
         this.terminal.onCancel(this.cancelCommand.bind(this));
     }
     onCommand(text) {
-        this.terminal.repeatInputText(text);
+        this.terminal.repeatInputText();
         let chain;
         try {
             chain = createChain(text, splitters, encapsulators);
@@ -189,6 +189,8 @@ export class SimpleShell {
         };
     }
     addCommand(name, cmdData, module = "") {
+        if (!("args" in cmdData))
+            cmdData.args = {};
         if (!("flags" in cmdData))
             cmdData.flags = {};
         if (!("oargs" in cmdData))

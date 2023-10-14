@@ -79,8 +79,7 @@ export class Terminal {
         if (e.ctrlKey && e.key == "c") { // ctrl-c
             if (this.els.consoleInput.selectionStart == this.els.consoleInput.selectionEnd) { // only trigger stop if nothing highlighted
                 this.cancelListeners.forEach(callback => { callback(); });
-                this.els.consoleInput.value += "%c{color:var(--command-err)}^C";
-                this.repeatInputText();
+                this.repeatInputText(this.els.consoleInput.value + "%c{color:var(--command-err)}^C");
                 this.els.consoleInput.value = "";
                 this.enable();
             }
@@ -118,8 +117,10 @@ export class Terminal {
         }
     }
     pushToHistory() {
-        if (this.commandHistory.length == 0 // always push to empty history
-            || this.els.consoleInput.value != this.commandHistory[this.commandHistory.length - 1]) { // don't push if same as last element
+        if (this.els.consoleInput.value.trim().length > 0 && ( // only push if non-empty string
+        this.commandHistory.length == 0 // always push to empty history
+            || this.els.consoleInput.value != this.commandHistory[this.commandHistory.length - 1] // don't push if same as last element
+        )) {
             this.commandHistory.push(this.els.consoleInput.value);
             localStorage.setItem(`console-${this.name}`, JSON.stringify(this.commandHistory));
         }
@@ -229,7 +230,7 @@ export class Terminal {
         }
     }
     repeatInputText(altInput = null) {
-        const line = Terminal.encode(this.els.inputIndicator.innerText + (altInput ?? this.els.consoleInput.value));
+        const line = this.els.inputIndicator.innerText + (altInput ?? Terminal.encode(this.els.consoleInput.value));
         // this.printLine(`%c{background-color:#ffffff44}${line}`);
         this.println(line);
     }

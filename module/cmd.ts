@@ -39,7 +39,7 @@ export class Command {
 }
 
 export type CommandStructure = {
-  args: Record<string,string> // argument name: description
+  args?: Record<string,string> // argument name: description
   oargs?: Record<string,string> // (o)ptional arguments; only accessible through -argname argvalue
   flags?: Record<string,string> // flags; like oargs, but these don't get values
   validate?: (command: Command) => string // able to do preprocessing on Command; returns empty string if command data is good, non-empty if invalid
@@ -60,7 +60,7 @@ export class SimpleShell {
   }
 
   protected onCommand(text: string) {
-    this.terminal.repeatInputText(text);
+    this.terminal.repeatInputText();
     let chain: ChainLink;
     try { chain = createChain(text, splitters, encapsulators); }
     catch(err) {
@@ -244,6 +244,7 @@ export class SimpleShell {
   }
 
   addCommand(name: string, cmdData: CommandStructure, module:string="") {
+    if (!("args" in cmdData)) cmdData.args = {};
     if (!("flags" in cmdData)) cmdData.flags = {};
     if (!("oargs" in cmdData)) cmdData.oargs = {};
     
