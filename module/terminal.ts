@@ -27,6 +27,7 @@ export class Terminal {
 
   private workingLine: HTMLDivElement = null;
   private workingText: string = "";
+  private allText: string = "";
 
   private commandHistory: string[] = [];
   private historyIndex: number = 0;
@@ -83,7 +84,7 @@ export class Terminal {
     this.setIndicatorText("> ");
 
     // sync history from local storage
-    const historyStr = localStorage.getItem(`console-${this.name}`);
+    const historyStr = localStorage.getItem(`Console:history:${this.name}`);
     if (historyStr) {
       try {
         const history = JSON.parse(historyStr)
@@ -91,6 +92,17 @@ export class Terminal {
           this.commandHistory = history;
           this.historyIndex = this.commandHistory.length;
         }
+      }
+      catch(_) {} // just prevent errors
+    }
+
+    // sync state from local storage
+    const stateStr = localStorage.getItem(`Console:state:${this.name}`);
+    if (stateStr) {
+      try {
+        const state = JSON.parse(stateStr);
+        this.print(state);
+        this.els.body.scrollTo(0, this.els.body.scrollHeight);
       }
       catch(_) {} // just prevent errors
     }
@@ -127,6 +139,7 @@ export class Terminal {
         this.resizeInput();
 
         this.els.consoleInput.selectionStart = this.els.consoleInput.value.length; // set caret at start
+        this.els.body.scrollTo(0, this.els.body.scrollHeight);
       }
     }
     else if (e.key == "ArrowDown") {
@@ -139,6 +152,7 @@ export class Terminal {
         this.resizeInput();
 
         this.els.consoleInput.selectionStart = this.els.consoleInput.value.length; // set caret at start
+        this.els.body.scrollTo(0, this.els.body.scrollHeight);
       }
     }
   }
@@ -151,9 +165,13 @@ export class Terminal {
       )
     ) {
       this.commandHistory.push(this.els.consoleInput.value);
-      localStorage.setItem(`console-${this.name}`, JSON.stringify(this.commandHistory));
+      localStorage.setItem(`Console:history:${this.name}`, JSON.stringify(this.commandHistory));
     }
     this.historyIndex = this.commandHistory.length;
+  }
+
+  private saveConsoleState() {
+    localStorage.setItem(`Console:state:${this.name}`, JSON.stringify(this.allText + this.workingText));
   }
 
   private resizeInput() {
@@ -238,14 +256,16 @@ export class Terminal {
         }
         if (i+1 < lines.length) { // not last itteration
           this.workingLine = this.buildLine(sections); // build new line
+          this.allText += `%c{${style}}${lines[i]}\n`;
           sections.splice(0); // clear list for clean slate
         }
       }
     }
     this.workingLine = this.buildLine(sections); // reassign working line to new line
     this.workingText = this.workingText.substring(this.workingText.lastIndexOf("\n")+1);
-
+    
     this.els.body.scrollTo(0, this.els.body.scrollHeight);
+    this.saveConsoleState();
   }
   println(text: string) {
     this.print(text + "\n");
@@ -266,18 +286,20 @@ export class Terminal {
 
   clear(clearHistory: boolean = false) {
     this.els.linesHolder.innerHTML = "";
+    this.allText = "";
     if (this.workingLine) {
       this.workingLine = null;
       this.workingText = "";
     }
+    this.saveConsoleState(); 
     if (clearHistory) {
       this.commandHistory.splice(0);
       this.historyIndex = 0;
     }
   }
 
-  repeatInputText(altInput: string = null) {
-    const line = this.els.inputIndicator.innerText + (altInput ?? Terminal.encode(this.els.consoleInput.value));
+  repeatInputText(altInput: string = null, doEncoding: boolean = false) {
+    const line = this.els.inputIndicator.innerText + ((doEncoding ? Terminal.encode(altInput) : altInput) ?? Terminal.encode(this.els.consoleInput.value));
     // this.printLine(`%c{background-color:#ffffff44}${line}`);
     this.println(line);
   }

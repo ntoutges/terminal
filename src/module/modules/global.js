@@ -3,7 +3,8 @@ export const module = {
     "echo": {
         args: {},
         oargs: {
-            "e": "The value to echo"
+            "e": "The value to echo",
+            "l": "Last characters added to the end"
         },
         flags: {
             "U": "print all characters in (U)ppercase",
@@ -52,7 +53,8 @@ export const module = {
 };
 function echoExecute(command, terminal, input = "") {
     return new Promise((resolve, reject) => {
-        let text = (input + command.getParam("e", "")).replaceAll("\\n", "\n");
+        command.endText = command.getParam("l", "\n");
+        let text = (input + command.getParam("e", "")).replaceAll("\\r", "\r").replaceAll("\\n", "\n");
         if (command.hasFlag("U"))
             text = text.toUpperCase();
         else if (command.hasFlag("l"))
@@ -90,7 +92,7 @@ function delayExecute(command, terminal, input = "") {
                 clearInterval(interval);
                 terminal.print("\r");
             }
-            resolve(delay.toString());
+            resolve("");
         }, delay);
         if (command.hasFlag("c")) {
             const end = (new Date()).getTime() + delay;

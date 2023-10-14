@@ -8,6 +8,7 @@ export class Command {
     flags = new Set();
     args = new Map();
     _isCanceled = false;
+    endText = "\n";
     constructor({ type, flags, args }) {
         this.type = type;
         for (const flag of flags) {
@@ -39,7 +40,7 @@ export class SimpleShell {
         this.terminal.onCancel(this.cancelCommand.bind(this));
     }
     onCommand(text) {
-        this.terminal.repeatInputText();
+        this.terminal.repeatInputText(text, false);
         let chain;
         try {
             chain = createChain(text, splitters, encapsulators);
@@ -65,13 +66,14 @@ export class SimpleShell {
         const cmdData = chain.execute(lastOutput, lastStatus);
         if (cmdData.command == null) { // finished--print output
             if (lastOutput.length > 0)
-                this.terminal.println(lastOutput);
+                this.terminal.print(lastOutput);
             this.currentCommand = null; // reset
             this.terminal.enable();
             return;
         }
-        if (cmdData.output)
-            this.terminal.println(cmdData.output); // next command doesn't use this, so print it out
+        if (cmdData.output.length > 0) {
+            this.terminal.print(cmdData.output); // next command doesn't use this, so print it out
+        }
         const parts = this.extractText(cmdData.command);
         const name = parts[0];
         if (this.commands.has(name)) {
@@ -93,6 +95,8 @@ export class SimpleShell {
                 cmdObject.execute.call(this, command, this.terminal, cmdData.input).then((output) => {
                     if (command.isCanceled)
                         return; // refer to local because global will likely be reassigned
+                    if (output.length > 0)
+                        output += command.endText;
                     this.runCommand(chain, output, true);
                 }).catch(output => {
                     if (command.isCanceled)

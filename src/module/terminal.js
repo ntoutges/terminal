@@ -17,6 +17,7 @@ export class Terminal {
     name; // used for local-storage shenanigans
     workingLine = null;
     workingText = "";
+    allText = "";
     commandHistory = [];
     historyIndex = 0;
     isDisabled = false;
@@ -63,7 +64,7 @@ export class Terminal {
         this.resizeInput();
         this.setIndicatorText("> ");
         // sync history from local storage
-        const historyStr = localStorage.getItem(`console-${this.name}`);
+        const historyStr = localStorage.getItem(`Console:history:${this.name}`);
         if (historyStr) {
             try {
                 const history = JSON.parse(historyStr);
@@ -71,6 +72,16 @@ export class Terminal {
                     this.commandHistory = history;
                     this.historyIndex = this.commandHistory.length;
                 }
+            }
+            catch (_) { } // just prevent errors
+        }
+        // sync state from local storage
+        const stateStr = localStorage.getItem(`Console:state:${this.name}`);
+        if (stateStr) {
+            try {
+                const state = JSON.parse(stateStr);
+                this.print(state);
+                this.els.body.scrollTo(0, this.els.body.scrollHeight);
             }
             catch (_) { } // just prevent errors
         }
@@ -103,6 +114,7 @@ export class Terminal {
                 this.els.consoleInput.value = this.commandHistory[this.historyIndex];
                 this.resizeInput();
                 this.els.consoleInput.selectionStart = this.els.consoleInput.value.length; // set caret at start
+                this.els.body.scrollTo(0, this.els.body.scrollHeight);
             }
         }
         else if (e.key == "ArrowDown") {
@@ -113,6 +125,7 @@ export class Terminal {
                 this.els.consoleInput.value = this.commandHistory[this.historyIndex] ?? "";
                 this.resizeInput();
                 this.els.consoleInput.selectionStart = this.els.consoleInput.value.length; // set caret at start
+                this.els.body.scrollTo(0, this.els.body.scrollHeight);
             }
         }
     }
@@ -122,9 +135,12 @@ export class Terminal {
             || this.els.consoleInput.value != this.commandHistory[this.commandHistory.length - 1] // don't push if same as last element
         )) {
             this.commandHistory.push(this.els.consoleInput.value);
-            localStorage.setItem(`console-${this.name}`, JSON.stringify(this.commandHistory));
+            localStorage.setItem(`Console:history:${this.name}`, JSON.stringify(this.commandHistory));
         }
         this.historyIndex = this.commandHistory.length;
+    }
+    saveConsoleState() {
+        localStorage.setItem(`Console:state:${this.name}`, JSON.stringify(this.allText + this.workingText));
     }
     resizeInput() {
         const bounds = this.getTextSize(this.els.consoleInput.value);
@@ -195,6 +211,7 @@ export class Terminal {
                 }
                 if (i + 1 < lines.length) { // not last itteration
                     this.workingLine = this.buildLine(sections); // build new line
+                    this.allText += `%c{${style}}${lines[i]}\n`;
                     sections.splice(0); // clear list for clean slate
                 }
             }
@@ -202,6 +219,7 @@ export class Terminal {
         this.workingLine = this.buildLine(sections); // reassign working line to new line
         this.workingText = this.workingText.substring(this.workingText.lastIndexOf("\n") + 1);
         this.els.body.scrollTo(0, this.els.body.scrollHeight);
+        this.saveConsoleState();
     }
     println(text) {
         this.print(text + "\n");
@@ -220,17 +238,19 @@ export class Terminal {
     }
     clear(clearHistory = false) {
         this.els.linesHolder.innerHTML = "";
+        this.allText = "";
         if (this.workingLine) {
             this.workingLine = null;
             this.workingText = "";
         }
+        this.saveConsoleState();
         if (clearHistory) {
             this.commandHistory.splice(0);
             this.historyIndex = 0;
         }
     }
-    repeatInputText(altInput = null) {
-        const line = this.els.inputIndicator.innerText + (altInput ?? Terminal.encode(this.els.consoleInput.value));
+    repeatInputText(altInput = null, doEncoding = false) {
+        const line = this.els.inputIndicator.innerText + ((doEncoding ? Terminal.encode(altInput) : altInput) ?? Terminal.encode(this.els.consoleInput.value));
         // this.printLine(`%c{background-color:#ffffff44}${line}`);
         this.println(line);
     }
