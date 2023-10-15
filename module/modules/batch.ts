@@ -374,9 +374,9 @@ function runExecute(command: Command, terminal: Terminal, input:string="") {
         
         if (size == 0) {
           removeFromPool(req.from);
-          terminal.println(`[${req.from}] left the pool. (x${size})`);
+          terminal.println(`[${req.from}] left the pool`);
         }
-        else terminal.println(`[${req.from}] has joined the pool.`);
+        else terminal.println(`[${req.from}] has joined the pool (x${size})`);
 
         const [args,inputs] = getArgs(size);
 

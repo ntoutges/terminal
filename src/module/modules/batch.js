@@ -337,10 +337,10 @@ function runExecute(command, terminal, input = "") {
                 const size = isNaN(cSize) ? 1 : Math.max(0, cSize);
                 if (size == 0) {
                     removeFromPool(req.from);
-                    terminal.println(`[${req.from}] left the pool. (x${size})`);
+                    terminal.println(`[${req.from}] left the pool`);
                 }
                 else
-                    terminal.println(`[${req.from}] has joined the pool.`);
+                    terminal.println(`[${req.from}] has joined the pool (x${size})`);
                 const [args, inputs] = getArgs(size);
                 if (args.length == 0) { // nothing to send
                     res.sendStatus(404, null);
