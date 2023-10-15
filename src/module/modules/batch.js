@@ -660,7 +660,6 @@ function combineBatches(data) {
                 action: "data",
                 data: batchResultData
             }).then(data => {
-                console.log(isBatchRunning);
                 if (data.status == 404)
                     return;
                 if (!isBatchRunning)
