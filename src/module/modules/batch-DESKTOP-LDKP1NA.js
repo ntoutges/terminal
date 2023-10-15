@@ -569,13 +569,6 @@ function joinExecute(command, terminal, input = "") {
     return new Promise((resolve, reject) => {
         clientData = this.client;
         gTerminal = terminal;
-        onPoolFailCallback = (str) => {
-            isBatchRunning = false;
-            clientData.off("socket", socketListener);
-            clientData.post("batch-join", { size: 0 }); // indicate leaving pool
-            clearInterval(cancelInterval);
-            reject(str);
-        };
         batchRunner = () => { return true; }; // if this is ever called, the data is finished
         const workers = command.getTemp("workers");
         batchCount = workers; // use this var as a count down
@@ -587,7 +580,7 @@ function joinExecute(command, terminal, input = "") {
                 buildPool(workers, runningRemoteExecute);
             }
             else
-                onPoolFailCallback("No batch process ongoing");
+                reject("No batch process ongoing");
         });
         clientData.on("socket", socketListener);
         function socketListener(data) {
@@ -671,7 +664,7 @@ function combineBatches(data) {
             }).catch(err => { onPoolFailCallback(err.message); });
         }
         catch (err) {
-            onPoolFailCallback(err.message);
+            console.log(err);
         }
         batchResultData.splice(0);
     }

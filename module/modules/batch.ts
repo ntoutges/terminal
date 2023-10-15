@@ -616,6 +616,14 @@ function joinExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
     clientData = this.client;
     gTerminal = terminal;
+
+    onPoolFailCallback = (str) => {
+      isBatchRunning = false;
+      clientData.off("socket", socketListener);
+      clientData.post("batch-join", { size: 0 }); // indicate leaving pool
+      clearInterval(cancelInterval);
+      reject(str);
+    };
     
     batchRunner = () => { return true; } // if this is ever called, the data is finished
 
@@ -628,7 +636,7 @@ function joinExecute(command: Command, terminal: Terminal, input:string="") {
         terminal.println("Successfully joined batch-function");
         buildPool(workers, runningRemoteExecute);
       }
-      else reject("No batch process ongoing");
+      else onPoolFailCallback("No batch process ongoing");
     });
 
     clientData.on("socket", socketListener);
@@ -702,18 +710,23 @@ function combineBatches(data: any) {
   batchResultData.push(data);
   if (batchResultData.length == batchCount) {
     if (isBatchRunning) gTerminal.println(`Sending batch data: [%c{background-color:#575757}${batchResultData.map((data) => { return data[1]; }).join(",")}%c{}]`);
-    clientData.post("batch", {
-      action: "data",
-      data: batchResultData
-    }).then(data => {
-      console.log(isBatchRunning)
-      if (data.status == 404) return;
-      if (!isBatchRunning) return;
+    try {
+      clientData.post("batch", {
+        action: "data",
+        data: batchResultData
+      }).then(data => {
+        console.log(isBatchRunning)
+        if (data.status == 404) return;
+        if (!isBatchRunning) return;
 
-      batchCount = data.body.length;
-      gTerminal.println(`%c{color:grey}Received ${batchCount} batches to run`);
-      jumpstartPool(data.body);
-    }).catch(err => { onPoolFailCallback(err.message); });
+        batchCount = data.body.length;
+        gTerminal.println(`%c{color:grey}Received ${batchCount} batches to run`);
+        jumpstartPool(data.body);
+      }).catch(err => { onPoolFailCallback(err.message); });
+    }
+    catch(err) {
+      onPoolFailCallback(err.message);
+    }
     batchResultData.splice(0);
   }
 }
