@@ -157,7 +157,7 @@ export class FileSystem {
   }
 
   // list... stuff?
-  ls(path:string = null) {
+  ls(path:string = null, ignorePsuedo: boolean = false) {
     let didStash = false;
     if (path) {
       didStash = true;
@@ -171,15 +171,17 @@ export class FileSystem {
 
     const items: {name:string, type:FileTypes}[] = [];
 
-    items.push({
-      name: ".",
-      type: FileTypes.Folder
-    });
-    if (this.path.length > 0) { // able to go back
+    if (!ignorePsuedo) { // ignore "." and ".."
       items.push({
-        name: "..",
+        name: ".",
         type: FileTypes.Folder
       });
+      if (this.path.length > 0) { // able to go back
+        items.push({
+          name: "..",
+          type: FileTypes.Folder
+        });
+      }
     }
 
     for (const name in this.localIndex.local) {
@@ -403,8 +405,49 @@ export class FileSystem {
     // expect caller to call saveIndex();
   }
 
-  get pathString() {
-    return this.drive + ":/" + this.path.join("/");
+  get pathString() { return this.drive + ":/" + this.path.join("/"); }
+
+  exists(name:string) {
+    let didStash = false;
+    [didStash,name] = this.navigateUpTo(name);
+    
+    let exists = (name in this.localIndex.local);
+    if (didStash) { this.unstashLocation(); }
+
+    return exists;
+  }
+  isFile(name:string) {
+    if (!this.exists(name)) return false;
+
+    let didStash = false;
+    [didStash,name] = this.navigateUpTo(name);
+    
+    let isFile = FileSystem.isFile(this.localIndex.local[name]);
+    if (didStash) { this.unstashLocation(); }
+
+    return isFile;
+  }
+  isDirectory(name:string) {
+    if (!this.exists(name)) return false;
+
+    let didStash = false;
+    [didStash,name] = this.navigateUpTo(name);
+    
+    let isDir = FileSystem.isFolder(this.localIndex.local[name]);
+    if (didStash) { this.unstashLocation(); }
+
+    return isDir;
+  }
+
+  assertDirectory(name:string) { // force this to be a directory, even if already a file
+    if (this.isDirectory(name)) return; // don't need to do anything
+    if (this.exists(name)) this.rm(name); // replace offending file with directory
+    this.mkdir(name);
+  }
+  assertFile(path:string) { // force this to be a file, even if already a directory
+    if (this.isFile(name)) return; // don't need to do anything
+    if (this.exists(name)) this.rm(name, true); // replace offending directory with file
+    this.mkfile(name);
   }
 
   static isFile(file: NavegableFileSystemIndex | FileType): file is FileType { return file.type == FileTypes.File; }

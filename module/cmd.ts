@@ -1,6 +1,8 @@
 import { ChainLink, createChain } from "./chaining.js";
 import { Terminal } from "./terminal.js";
 import { FileSystem } from "./drive.js";
+import { Server } from "./vserver/server.js";
+import { Client } from "./vserver/client.js";
 
 const splitters = ["||","&&","|",";"];
 const encapsulators = { "\"": "\"", "'": "'" };
@@ -60,14 +62,22 @@ export class SimpleShell {
   protected readonly terminal: Terminal;
   protected readonly commands: Map<string,CommandStructure> = new Map<string,CommandStructure>();
   protected currentCommand: Command = null;
-  private readonly fs = new FileSystem("C");
+  readonly fs: FileSystem;
+
+  readonly client: Client;
+  readonly server: Server 
+
+  private readonly toInit: Array<()=>void> = [];
 
   constructor(
-    terminal: Terminal
+    terminal: Terminal,
+    driveLetter: string = "C"
   ) {
     this.terminal = terminal;
     this.terminal.onCommand(this.onCommand.bind(this));
     this.terminal.onCancel(this.cancelCommand.bind(this));
+
+    this.fs = new FileSystem(driveLetter);
   }
 
   protected onCommand(text: string) {
@@ -141,19 +151,18 @@ export class SimpleShell {
         }
         cmdObject.execute.call(this,command, this.terminal, cmdData.input).then((output: string) => {
           if (command.isCanceled) return; // refer to local because global will likely be reassigned
-          if (output.length > 0) output += command.endText;
+          if (output) output += command.endText;
           this.runCommand(
             chain,
             output,
             true
           );
         }).catch((output:string) => {
-          debugger
           if (command.isCanceled) return; // refer to local because global will likely be reassigned
-          if (output.length > 0) output += command.endText;
+          if (output) output += command.endText;
           this.runCommand(
             chain,
-            output,
+            "%c{color:var(--command-err)}" + output,
             false
           );  
         });
@@ -269,7 +278,7 @@ export class SimpleShell {
   }
   addModule(module: string, moduleData: Record<string, CommandStructure>, init:()=>void = null) {
     for (const name in moduleData) { this.addCommand(name, moduleData[name], module); }
-    if (init) init.call(this);
+    if(init) this.toInit.push(init);
   }
 
   isCommand(command: string) { return this.commands.has(command); }
@@ -278,5 +287,10 @@ export class SimpleShell {
     const commandList: string[] = [];
     for (const command of this.commands.keys()) { commandList.push(command); }
     return commandList;
+  }
+
+  runInit() {
+    this.toInit.forEach(callback => { callback.call(this); });
+    this.toInit.splice(0);
   }
 }

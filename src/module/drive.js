@@ -122,7 +122,7 @@ export class FileSystem {
         return true; // success!
     }
     // list... stuff?
-    ls(path = null) {
+    ls(path = null, ignorePsuedo = false) {
         let didStash = false;
         if (path) {
             didStash = true;
@@ -136,15 +136,17 @@ export class FileSystem {
             }
         }
         const items = [];
-        items.push({
-            name: ".",
-            type: FileTypes.Folder
-        });
-        if (this.path.length > 0) { // able to go back
+        if (!ignorePsuedo) { // ignore "." and ".."
             items.push({
-                name: "..",
+                name: ".",
                 type: FileTypes.Folder
             });
+            if (this.path.length > 0) { // able to go back
+                items.push({
+                    name: "..",
+                    type: FileTypes.Folder
+                });
+            }
         }
         for (const name in this.localIndex.local) {
             items.push({
@@ -364,8 +366,51 @@ export class FileSystem {
         delete head[name];
         // expect caller to call saveIndex();
     }
-    get pathString() {
-        return this.drive + ":/" + this.path.join("/");
+    get pathString() { return this.drive + ":/" + this.path.join("/"); }
+    exists(name) {
+        let didStash = false;
+        [didStash, name] = this.navigateUpTo(name);
+        let exists = (name in this.localIndex.local);
+        if (didStash) {
+            this.unstashLocation();
+        }
+        return exists;
+    }
+    isFile(name) {
+        if (!this.exists(name))
+            return false;
+        let didStash = false;
+        [didStash, name] = this.navigateUpTo(name);
+        let isFile = FileSystem.isFile(this.localIndex.local[name]);
+        if (didStash) {
+            this.unstashLocation();
+        }
+        return isFile;
+    }
+    isDirectory(name) {
+        if (!this.exists(name))
+            return false;
+        let didStash = false;
+        [didStash, name] = this.navigateUpTo(name);
+        let isDir = FileSystem.isFolder(this.localIndex.local[name]);
+        if (didStash) {
+            this.unstashLocation();
+        }
+        return isDir;
+    }
+    assertDirectory(name) {
+        if (this.isDirectory(name))
+            return; // don't need to do anything
+        if (this.exists(name))
+            this.rm(name); // replace offending file with directory
+        this.mkdir(name);
+    }
+    assertFile(path) {
+        if (this.isFile(name))
+            return; // don't need to do anything
+        if (this.exists(name))
+            this.rm(name, true); // replace offending directory with file
+        this.mkfile(name);
     }
     static isFile(file) { return file.type == FileTypes.File; }
     static isFolder(folder) { return folder.type == FileTypes.Folder; }

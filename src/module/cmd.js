@@ -44,11 +44,15 @@ export class SimpleShell {
     terminal;
     commands = new Map();
     currentCommand = null;
-    fs = new FileSystem("C");
-    constructor(terminal) {
+    fs;
+    client;
+    server;
+    toInit = [];
+    constructor(terminal, driveLetter = "C") {
         this.terminal = terminal;
         this.terminal.onCommand(this.onCommand.bind(this));
         this.terminal.onCancel(this.cancelCommand.bind(this));
+        this.fs = new FileSystem(driveLetter);
     }
     onCommand(text) {
         this.terminal.repeatInputText(text, false);
@@ -106,16 +110,15 @@ export class SimpleShell {
                 cmdObject.execute.call(this, command, this.terminal, cmdData.input).then((output) => {
                     if (command.isCanceled)
                         return; // refer to local because global will likely be reassigned
-                    if (output.length > 0)
+                    if (output)
                         output += command.endText;
                     this.runCommand(chain, output, true);
                 }).catch((output) => {
-                    debugger;
                     if (command.isCanceled)
                         return; // refer to local because global will likely be reassigned
-                    if (output.length > 0)
+                    if (output)
                         output += command.endText;
-                    this.runCommand(chain, output, false);
+                    this.runCommand(chain, "%c{color:var(--command-err)}" + output, false);
                 });
             }
             catch (err) {
@@ -221,7 +224,7 @@ export class SimpleShell {
             this.addCommand(name, moduleData[name], module);
         }
         if (init)
-            init.call(this);
+            this.toInit.push(init);
     }
     isCommand(command) { return this.commands.has(command); }
     getCommand(command) { return this.commands.get(command); }
@@ -231,6 +234,10 @@ export class SimpleShell {
             commandList.push(command);
         }
         return commandList;
+    }
+    runInit() {
+        this.toInit.forEach(callback => { callback.call(this); });
+        this.toInit.splice(0);
     }
 }
 //# sourceMappingURL=cmd.js.map

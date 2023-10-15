@@ -43,3 +43,46 @@ function({batch,step,p,r,B, offset}) {
 function(input,output) {
   return output
 }
+
+
+
+
+
+
+
+
+
+// runner2
+function({min,max,target}) {
+  for (let i = min; i < max; i++) {
+    if (i == target) return i;
+  }
+  return false;
+}
+
+// generator2
+function({batch,step,target}) {
+  const next = batch*step;
+  console.log(`Batch #${1+batch}: ${next}`)
+
+  return {
+    min: next,
+    max: next + step,
+    target: target
+  }
+}
+
+// combinator2
+function(input,output) {
+  if (output === false) return false;
+  return output;
+}
+
+
+
+
+
+
+
+
+
