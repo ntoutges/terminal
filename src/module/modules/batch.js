@@ -372,6 +372,7 @@ function runExecute(command, terminal, input = "") {
                     default:
                         console.log(req.body.action);
                 }
+                console.log(isBatchRunning);
                 const remoteWorker = remoteWorkers[req.from];
                 const [args, inputs] = getArgs(remoteWorker.size);
                 remoteWorker.awaiting = inputs;
@@ -612,6 +613,7 @@ function joinExecute(command, terminal, input = "") {
         // occasionally check if process was stopped
         const cancelInterval = setInterval(() => {
             if (command.isCanceled) {
+                isBatchRunning = false;
                 clientData.off("socket", socketListener);
                 clientData.post("batch-join", { size: 0 }); // indicate leaving pool
                 clearInterval(cancelInterval);
@@ -650,6 +652,7 @@ function combineBatches(data) {
             action: "data",
             data: batchResultData
         }).then(data => {
+            console.log(isBatchRunning);
             if (data.status == 404)
                 return;
             if (!isBatchRunning)
