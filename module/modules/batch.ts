@@ -369,10 +369,15 @@ function runExecute(command: Command, terminal: Terminal, input:string="") {
         return true;
       });
       serverData?.post("batch-join", (req: Request, res: Response) => {
-
         const cSize = parseInt(req.body.size,10);
-        const size = isNaN(cSize) ? 1 : Math.max(1,cSize);
+        const size = isNaN(cSize) ? 1 : Math.max(0,cSize);
         
+        if (size == 0) {
+          removeFromPool(req.from);
+          terminal.println(`[${req.from}] left the pool. (x${size})`);
+        }
+        else terminal.println(`[${req.from}] has joined the pool.`);
+
         const [args,inputs] = getArgs(size);
 
         if (args.length == 0) { // nothing to send
@@ -487,15 +492,7 @@ function checkIfDone(input: any, output: any) {
   });
 
   missedBatches = [];
-  serverData?.on("disconnect", (id:string) => {
-    if (id in remoteWorkers) {
-      const missings = remoteWorkers[id].awaiting;
-      if (missings.length > 0) {
-        gTerminal.println(`Lost batches [%c{color:lightgreen}${missings.join(",")}%c{}]`);
-        for (const missing of missings) { missedBatches.push(missing); }
-      }
-    }
-  });
+  serverData?.on("disconnect", removeFromPool);
 
   let res: string;
   if (typeof result == "object") res = JSON.stringify(result);  
@@ -510,6 +507,16 @@ function checkIfDone(input: any, output: any) {
 
   serverData = null;
   return true;
+}
+
+function removeFromPool(id: string) {
+  if (id in remoteWorkers) {
+    const missings = remoteWorkers[id].awaiting;
+    if (missings.length > 0) {
+      gTerminal.println(`Lost batches [%c{color:lightgreen}${missings.join(",")}%c{}]`);
+      for (const missing of missings) { missedBatches.push(missing); }
+    }
+  }
 }
 
 // creates worker pool used in execution
@@ -658,6 +665,7 @@ function joinExecute(command: Command, terminal: Terminal, input:string="") {
     const cancelInterval = setInterval(() => {
       if (command.isCanceled) {
         clientData.off("socket", socketListener);
+        clientData.post("batch-join", { size: 0 }); // indicate leaving pool
         clearInterval(cancelInterval);
       }
     }, 500);
@@ -697,9 +705,10 @@ function combineBatches(data: any) {
       data: batchResultData
     }).then(data => {
       if (data.status == 404) return;
+      if (!isBatchRunning) return;
 
       batchCount = data.body.length;
-      if (isBatchRunning) gTerminal.println(`%c{color:grey}Received ${batchCount} batches to run`);
+      gTerminal.println(`%c{color:grey}Received ${batchCount} batches to run`);
       jumpstartPool(data.body);
     }).catch(err => { onPoolFailCallback(err.message); });
     batchResultData.splice(0);
