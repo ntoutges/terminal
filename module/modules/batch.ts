@@ -293,6 +293,18 @@ function runValidate(command: Command) {
   return "";
 }
 
+function getArgs(size: number) {
+  const args = [];
+  const inputs = [];
+  for (let i = 0; i < size; i++) {
+    const arg = batchRunner();
+    if (arg === true) break; // out of numbers to dole out
+    args.push(arg);
+    inputs.push(batchCount - 1);
+  }
+  return [args,inputs]
+}
+
 function runExecute(command: Command, terminal: Terminal, input:string="") {
   return new Promise<string>((resolve,reject) => {
     onPoolFinishCallback = resolve;
@@ -352,16 +364,11 @@ function runExecute(command: Command, terminal: Terminal, input:string="") {
       initPool(batchFunctionData[0], batchFunctionData[1]);
       jumpstartPool();
 
-      function getArgs(size: number) {
-        const args = [];
-        const inputs = [];
-        for (let i = 0; i < size; i++) {
-          const arg = batchRunner();
-          if (arg === true) break; // out of numbers to dole out
-          args.push(arg);
-          inputs.push(batchCount - 1);
+      if (serverData) {
+        // initiate remote workers from previous batches
+        for (const id in remoteWorkers) {
+          addToPool(id, remoteWorkers[id].size, batchFunctionData);
         }
-        return [args,inputs]
       }
 
       serverData?.post("batch-watch", (req: Request, res: Response) => {
@@ -369,34 +376,7 @@ function runExecute(command: Command, terminal: Terminal, input:string="") {
         return true;
       });
       serverData?.post("batch-join", (req: Request, res: Response) => {
-        const cSize = parseInt(req.body.size,10);
-        const size = isNaN(cSize) ? 1 : Math.max(0,cSize);
-        
-        if (size == 0) {
-          removeFromPool(req.from);
-          terminal.println(`[${req.from}] left the pool`);
-        }
-        else terminal.println(`[${req.from}] has joined the pool (x${size})`);
-
-        const [args,inputs] = getArgs(size);
-
-        if (args.length == 0) { // nothing to send
-          res.sendStatus(404, null);
-          return;
-        }
-
-        res.sendStatus(200, null);
-        serverData.sendSocket("*", {
-          path: "batch-init",
-          data: {
-            func: batchFunctionData,
-            jumpstart: args
-          }
-        });
-        remoteWorkers[req.from] = {
-          size,
-          awaiting: inputs
-        };
+        addToPool(req.from, req.body.size, batchFunctionData, res);
         return true;
       });
 
@@ -412,9 +392,13 @@ function runExecute(command: Command, terminal: Terminal, input:string="") {
           default:
             console.log(req.body.action)
         }
-        console.log(isBatchRunning)
 
         const remoteWorker = remoteWorkers[req.from];
+        if (!remoteWorker) { // no longer in pool
+          res.send([]);
+          return true;
+        }
+
         const [args,inputs] = getArgs( remoteWorker.size );
         remoteWorker.awaiting = inputs;
         res.send(args);
@@ -437,7 +421,7 @@ function runExecute(command: Command, terminal: Terminal, input:string="") {
         serverData?.unpost("batch-watch");
         serverData?.unpost("batch-join");
         serverData?.unpost("batch");
-        remoteWorkers = {};
+        // remoteWorkers = {};
       }
     }, 500);
   });
@@ -482,7 +466,7 @@ function checkIfDone(input: any, output: any) {
   serverData?.unpost("batch-watch");
   serverData?.unpost("batch-join");
   serverData?.unpost("batch");
-  remoteWorkers = {};
+  // remoteWorkers = {};
 
   gTerminal.println(text);
 
@@ -510,6 +494,37 @@ function checkIfDone(input: any, output: any) {
   return true;
 }
 
+function addToPool(from: string, size2: any, batchFunctionData: [header: string, body: string], res?: Response) {
+  const cSize = parseInt(size2,10);
+  const size = isNaN(cSize) ? 1 : Math.max(0,cSize);
+  
+  if (size == 0) {
+    removeFromPool(from);
+    console.log(`[${from}] left the pool`);
+  }
+  else console.log(`[${from}] has joined the pool (x${size})`);
+
+  const [args,inputs] = getArgs(size);
+
+  if (args.length == 0) { // nothing to send
+    res?.sendStatus(404, null);
+    return;
+  }
+
+  res?.sendStatus(200, null);
+  serverData.sendSocket(from, {
+    path: "batch-init",
+    data: {
+      func: batchFunctionData,
+      jumpstart: args
+    }
+  });
+  remoteWorkers[from] = {
+    size,
+    awaiting: inputs
+  };
+}
+
 function removeFromPool(id: string) {
   if (id in remoteWorkers) {
     const missings = remoteWorkers[id].awaiting;
@@ -517,6 +532,7 @@ function removeFromPool(id: string) {
       gTerminal.println(`Lost batches [%c{color:lightgreen}${missings.join(",")}%c{}]`);
       for (const missing of missings) { missedBatches.push(missing); }
     }
+    delete remoteWorkers[id];
   }
 }
 
@@ -655,10 +671,12 @@ function joinExecute(command: Command, terminal: Terminal, input:string="") {
       else if (data.path == "batch-watch") {
         switch (data.action) {
           case "end":
-            clientData.off("socket", socketListener);
-            resolve(data.data ? data.data : "Batch Terminated");
-            isBatchRunning = false;
-            clearPool();
+            // clientData.off("socket", socketListener);
+            // resolve(data.data ? data.data : "Batch Terminated");
+            // isBatchRunning = false;
+            // clearPool();
+            terminal.println(data.data ? data.data : "Batch Terminated");
+            terminal.println("Remote batch will continue to listen for new batch-functions");
             break;
           case "print":
             terminal.println(data.data);
@@ -670,13 +688,22 @@ function joinExecute(command: Command, terminal: Terminal, input:string="") {
       }
     }
 
+    // server has disconnected, stop running
+    clientData.on("disconnect", doCommandCancel);
+    function doCommandCancel() { 
+      isBatchRunning = false;
+      clientData.off("socket", socketListener);
+      clientData.post("batch-join", { size: 0 }); // indicate leaving pool
+      clientData.off("disconnect", doCommandCancel);
+      clearInterval(cancelInterval);
+      reject("Lost connection to server");
+    }
+
     // occasionally check if process was stopped
     const cancelInterval = setInterval(() => {
       if (command.isCanceled) {
-        isBatchRunning = false;
-        clientData.off("socket", socketListener);
-        clientData.post("batch-join", { size: 0 }); // indicate leaving pool
-        clearInterval(cancelInterval);
+        reject("");
+        doCommandCancel();
       }
     }, 500);
   });
